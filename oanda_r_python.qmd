@@ -1,0 +1,74 @@
+---
+title: "Oanda_Application"
+format:
+  html:
+    code-fold: True
+    code-summary: "Show the code"
+---
+
+## Quarto
+
+Quarto enables you to weave together content and executable code into a finished document. To learn more about Quarto see <https://quarto.org>.
+
+## Running Code
+
+When you click the **Render** button a document will be generated that includes both content and the output of embedded code. You can embed code like this:
+
+```{r}
+library(reticulate)
+use_condaenv("~/anaconda3/envs/ML_gpu/bin/python3.9") 
+```
+
+```{python}
+#| echo: true
+#| output: false
+import pandas as pd
+import tpqoa
+api = tpqoa.tpqoa("./oanda.cfg")
+api.get_instruments()
+api.get_history(instrument = "EUR_USD", start = "2021-03-29", end = "2021-03-31",
+                granularity = "M1", price = "M", localize = False)
+```
+
+You can add options to executable code like this
+
+```{python}
+#| echo: true
+#| output: false
+#api.stream_data("EUR_USD", stop = 20) 
+api.create_order(instrument = "EUR_USD", units = 100000)
+```
+
+```{python}
+import pandas as pd
+import numpy as np
+import tpqoa
+from datetime import datetime, timedelta
+import time
+```
+
+```{python}
+#| echo: true
+#| output: true
+days = 5
+now = datetime.utcnow() #- timedelta(days = 10)
+now = now - timedelta(microseconds = now.microsecond)
+past = now - timedelta(days = days)
+df = api.get_history(instrument = "EUR_USD", start = "2010-01-01", end = "2010-01-10", granularity = "H1", price = "B", localize = True).c.dropna().to_frame()
+df.rename(columns = {"c":"EUR_USD"}, inplace = True)
+df.to_csv('./your_array.csv', header=True, index=True)
+df.resample("1min", label = "right").last().dropna().iloc[:-1]
+```
+
+```{r}
+#| echo: true
+#| output: false
+library(ichimoku)
+library(data.table)
+library(tidyverse)
+EUR_USD_bid <- oanda("EUR_USD", from = "2010-01-01", to = "2023-01-09", price = "B", granularity = "D", 
+                     apikey = "f0f52db1eca144c5c56f704b2e6c4e5d-c72bee0bf2bdf140615296ac23f51341") %>% as.data.table()
+EUR_USD_ask <- oanda("EUR_USD", from = "2010-01-01", to = Sys.Date(), price = "A", granularity = "D", 
+                     apikey = "f0f52db1eca144c5c56f704b2e6c4e5d-c72bee0bf2bdf140615296ac23f51341") %>% as.data.table()
+```
+
