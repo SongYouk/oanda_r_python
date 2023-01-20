@@ -1,9 +1,13 @@
 ---
 title: "Oanda_Application"
-format:
+format: 
   html:
-    code-fold: True
+    theme: cerulean
+    fontsize: 12px
+    max-width: 1600px
+    #code-fold: False
     code-summary: "Show the code"
+    code-fold: show
 ---
 
 ## Quarto
@@ -54,10 +58,13 @@ days = 5
 now = datetime.utcnow() #- timedelta(days = 10)
 now = now - timedelta(microseconds = now.microsecond)
 past = now - timedelta(days = days)
-df = api.get_history(instrument = "EUR_USD", start = "2010-01-01", end = "2010-01-10", granularity = "H1", price = "B", localize = True).c.dropna().to_frame()
+df = api.get_history(instrument = "EUR_USD", start = "2010-01-01", end = "2010-01-10", granularity = "H1", price = "B",
+localize = True).c.dropna().to_frame()
 df.rename(columns = {"c":"EUR_USD"}, inplace = True)
 df.to_csv('./your_array.csv', header=True, index=True)
 df.resample("1min", label = "right").last().dropna().iloc[:-1]
+df["SMA_7days"] = df.EUR_USD.rolling(7).mean()
+df
 ```
 
 ```{r}
@@ -66,9 +73,51 @@ df.resample("1min", label = "right").last().dropna().iloc[:-1]
 library(ichimoku)
 library(data.table)
 library(tidyverse)
-EUR_USD_bid <- oanda("EUR_USD", from = "2010-01-01", to = "2023-01-09", price = "B", granularity = "D", 
-                     apikey = "f0f52db1eca144c5c56f704b2e6c4e5d-c72bee0bf2bdf140615296ac23f51341") %>% as.data.table()
-EUR_USD_ask <- oanda("EUR_USD", from = "2010-01-01", to = Sys.Date(), price = "A", granularity = "D", 
-                     apikey = "f0f52db1eca144c5c56f704b2e6c4e5d-c72bee0bf2bdf140615296ac23f51341") %>% as.data.table()
+library(config)
+library(lubridate)
+EUR_USD_bid <- oanda("EUR_USD", from = "2010-01-01", to = Sys.Date() - days(1), price = "B", granularity = "D", 
+                     apikey = config::get("access_token")) %>% as.data.table()
+EUR_USD_bid[, time:=as.Date(time)]
+xy <- c("open", "high", "low", "close", "volume")
+xy_newnames <- paste0(xy,"_bid")
+setnames(EUR_USD_bid,xy,xy_newnames)
+xy_SMA_7days <- paste0(xy_newnames, "_SMA_7days")
+EUR_USD_bid[, (xy_SMA_7days):=lapply(.SD, frollmean, n = 7, fill=NA), .SDcols=xy_newnames]
+
+setkey(EUR_USD_bid, time)
+# python code
+# data.price.rolling(7).mean()
+EUR_USD_ask <- oanda("EUR_USD", from = "2010-01-01", to = Sys.Date() - days(1), price = "A", granularity = "D", 
+                     apikey = config::get("access_token")) %>% as.data.table()
+EUR_USD_ask[, time:=as.Date(time)]
+xy <- c("open", "high", "low", "close", "volume")
+xy_newnames <- paste0(xy,"_ask")
+setnames(EUR_USD_ask,xy,xy_newnames)
+xy_SMA_7days <- paste0(xy_newnames, "_SMA_7days")
+EUR_USD_ask[, (xy_SMA_7days):=lapply(.SD, frollmean, n = 7, fill=NA), .SDcols=xy_newnames]
+
+setkey(EUR_USD_ask, time)
+EUR_USD_bid_ask <- merge.data.table(EUR_USD_bid, EUR_USD_ask)
+EUR_USD_bid_ask[,c("complete.x", "complete.y")] <- NULL
+
+#EUR_USD_bid_ask[, SellorBuy:=ifelse(close_bid > open_ask, "sell", ifelse())]
+```
+
+```{r}
+#| echo: true
+library(plotly)
+library(dygraphs)
+
+# ts_graph <- dygraph(EUR_USD_bid_ask[,c("time","open_bid")]) %>% 
+#   dySeries("open_bid", label="open_bid") %>% 
+#   dyOptions(fillGraph = FALSE, drawYAxis = TRUE, drawGrid = FALSE, labelsUTC = TRUE) %>% 
+#   dyLegend(show = "follow", width = 400) %>% 
+#   dyAxis(axisl)
+# ts_graph
+
+plot <- ggplot(data = EUR_USD_bid_ask, aes(time)) +
+  geom_line(aes(y=open_ask), colour = "blue") + 
+  geom_line(aes(y=open_bid), colour = "red")
+ggplotly(plot)
 ```
 
